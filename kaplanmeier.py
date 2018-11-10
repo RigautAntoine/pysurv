@@ -7,6 +7,7 @@ class KaplanMeier():
     Non-parametric estimator of the survival function
     for non- or right-censored data.
     
+    TO-DO: Strata, confidence interval
     """
     
     def __init__(self, events, durations):
