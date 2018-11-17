@@ -57,7 +57,9 @@ class KaplanMeier():
     
     def _compute_confidence_bounds(self, alpha = None):
         '''
-        Kalbfleisch and Prentice (2002) method
+        Kalbfleisch and Prentice (1980) method
+        “exponential” Greenwood formula
+        https://www.math.wustl.edu/%7Esawyer/handouts/greenwood.pdf
         '''
         
         if alpha is not None:
@@ -65,22 +67,29 @@ class KaplanMeier():
         
         _EPSILON = 1e-5
         # Computation of these should be moved to fitting part. Not gonna change
-        #stable_survival = np.maximum(self._survival, _EPSILON) # Numerical stability with the log
-        stable_survival = self._survival
+        stable_survival = np.maximum(self._survival, _EPSILON) # Numerical stability with the log
+        #stable_survival = self._survival
         
-        var_t = np.cumsum(self._lifetable['failures'] / (self._lifetable['at-risk'] * (self._lifetable['at-risk'] - self._lifetable['failures']))) / (stable_survival)**2
+        deaths = self._lifetable['failures'].values
+        ns = self._lifetable['at-risk'].values
+        
+        var_t = stable_survival**2 * np.cumsum(deaths / (ns * (ns - deaths)))
+        var_t_p = np.cumsum(deaths / (ns * (ns - deaths))) / np.log(stable_survival)**2 
         
         z = self._compute_z_score()
         
-        c1 = np.log(-np.log(stable_survival)) + z * np.sqrt(var_t)
-        c2 = np.log(-np.log(stable_survival)) - z * np.sqrt(var_t)
+        c1 = np.log(-np.log(stable_survival)) + z * np.sqrt(var_t_p)
+        c2 = np.log(-np.log(stable_survival)) - z * np.sqrt(var_t_p)
         
         confidence = pd.DataFrame()
         confidence['time'] = self._unique_event_times
-        confidence['var'] = var_t
+        confidence['at-risk'] = ns
+        confidence['failures'] = deaths
+        confidence['survival'] = stable_survival
+        confidence['var'] = var_t_p
         confidence['lower'] = np.exp(-np.exp(c1))
         confidence['upper'] = np.exp(-np.exp(c2))
-        confidence = confidence.fillna(0)
+        #confidence = confidence.fillna(0)
         
         return confidence
     
