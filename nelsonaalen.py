@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pylab as plt
+from .stats import inv_normal_cdf
 
 
 class NelsonAalen():
@@ -13,13 +14,14 @@ class NelsonAalen():
     TO-DO: variance and confidence interval, and strata
     """
     
-    def __init__(self, events, durations, entry_time=None):
+    def __init__(self, events, durations, entry_time=None, alpha=0.95):
         """
         Params:
             events (numpy.array): 0 or 1
             durations (numpy.array): time at which event happened or observation was censored 
             entry_time (numpy.array): time of entry into study (default is None - entry T is 0 for all)
         """
+        self.alpha = alpha
         self.events = events
         self.durations = durations
         
@@ -48,9 +50,19 @@ class NelsonAalen():
             
         lifetable = pd.DataFrame({'at-risk': risk, 'failures':failures}, index=unique_event_times)
         lifetable['cumhaz'] = (failures / risk).cumsum()
+        lifetable['se'] = np.sqrt((((risk-failures) * failures)/((risk-1)*risk**2) ).cumsum())
+        z = self._compute_z_score()
+        lifetable['lower'] = lifetable['cumhaz'] - z * lifetable['se']
+        lifetable['upper'] = lifetable['cumhaz'] + z * lifetable['se']
         lifetable['survival'] = np.exp(-lifetable['cumhaz'])
         
+        
         self._lifetable = lifetable
+    
+    def _compute_z_score(self, alpha = None):
+        if alpha is None:
+            alpha = self.alpha
+        return inv_normal_cdf((1. + alpha) / 2.)
     
     def summary(self):
         '''
