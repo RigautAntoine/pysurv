@@ -13,7 +13,49 @@ def _negative_log_likelihood(lambda_rho, E, T):
         ll += E[i] * np.log(rho * _lambda * (_lambda*T[i])**(rho-1))
         
     return -ll
+
+def _negative_log_likelihood_multivariate(lambda_rho, E, T, X):
     
+    beta, rho = lambda_rho[:-1], lambda_rho[-1]
+    _lambda = np.exp(-X.dot(beta))
+    
+    if rho <= 0:
+        return np.inf
+    
+    ll = 0
+    n = len(E)
+    for i in range(n):
+        
+        ll += -(_lambda[i]*T[i])**rho
+        ll += E[i] * np.log(rho * _lambda[i] * (_lambda[i]*T[i])**(rho-1))
+        
+    return -ll
+
+class Weibull():
+    """
+    Implements parametric Weibull accelerated failure time model:
+   
+    In the multivariate case, rho is held constant across observation 
+    while lambda is reparameterized in terms of predictor variables and covariate coefficients
+    """
+    def __init__(self, events, durations, X):
+        self.events = events
+        self.durations = durations
+        self.X = X
+        self.k = X.shape[1]
+        self._fit()
+    
+    def _fit(self):
+        lambda_rho = minimize(_negative_log_likelihood_multivariate, 
+                            x0 = np.ones(self.k+1)*0.01, 
+                            args= (self.events, self.durations, self.X))['x']
+        
+        self._lambda, self._rho =  lambda_rho[:-1], lambda_rho[-1]
+        
+        #self._max_duration = self.durations.max()
+        #self._timeline = np.linspace(0, self._max_duration, 100)
+        #self._survival = np.exp(-(self._lambda * self._timeline)**self._rho)
+        
 
 class WeibullUnivariate():
     """
