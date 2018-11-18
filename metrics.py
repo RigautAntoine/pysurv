@@ -1,6 +1,30 @@
 import numpy as np
 from collections import Counter
 
+def p_survival_time(survival_function, p):
+    if survival_function.iloc[-1] > p:
+        return np.nan
+    else:
+        return (survival_function <= p).idxmax(0) 
+    
+def tolist(x):
+    if isinstance(x, (list, tuple)):
+        return x
+    else:
+        return [x]
+
+def p_survival_times(survival_times, p):
+    """
+    Expects a Pandas dataframe made up of survival functions
+    """
+    p = tolist(p)
+    for x in p:
+        assert (x<1) and (x>0), "Percentile not a float between 0 and 1. Given {}".format(x)
+    df = pd.DataFrame(dict((q, survival_times.apply(lambda x: p_survival_time(x, q))) for q in p))
+    
+    return df#.iloc[0]
+    
+
 def _concordance_index(durations, predicted, events):
     '''
     Concordance index is a value between 0 and 1 which measures the concordance

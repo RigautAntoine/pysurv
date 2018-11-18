@@ -1,7 +1,8 @@
 import numpy as np
+import pandas as pd
 import matplotlib.pylab as plt
 from scipy.optimize import minimize
-from .metrics import _concordance_index
+from .metrics import _concordance_index, p_survival_times
 
 def _partial_log_likelihood(betas, X, events, durations):
     """
@@ -73,6 +74,7 @@ class CoxPH():
                             x0 = self.betas, 
                             args= (self.X, self.events, self.durations))
         self.betas = self.res['x']
+        # Good enough: but could test against survival
         self.standard_errors = np.sqrt(np.diag(self.res['hess_inv']))
         
         self._compute_baseline_hazard()
@@ -120,7 +122,11 @@ class CoxPH():
         """
         Predict median lifetime
         """
-        pass
+        return self.predict_percentile_lifetime(0.50, X)
+    
+    def predict_percentile_lifetime(self, p, X):
+        survival_times = self.predict_survival(X)
+        return p_survival_times(survival_times, p=p)
     
     def predict_cumulative_hazard(self, X):
         """
