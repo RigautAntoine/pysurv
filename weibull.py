@@ -43,19 +43,44 @@ class Weibull():
         self.durations = durations
         self.X = X
         self.k = X.shape[1]
+        self.unique_event_times = np.unique(self.durations[self.events==1])
+        self.unique_event_times.sort()
         self._fit()
     
     def _fit(self):
-        lambda_rho = minimize(_negative_log_likelihood_multivariate, 
+        self.res = minimize(_negative_log_likelihood_multivariate, 
                             x0 = np.ones(self.k+1)*0.01, 
-                            args= (self.events, self.durations, self.X))['x']
+                            args= (self.events, self.durations, self.X))
+        
+        lambda_rho = self.res['x']
+        # Standard errors aren't good here
+        self.standard_errors = np.sqrt(np.diag(self.res['hess_inv']))
         
         self._lambda, self._rho =  lambda_rho[:-1], lambda_rho[-1]
         
         #self._max_duration = self.durations.max()
         #self._timeline = np.linspace(0, self._max_duration, 100)
         #self._survival = np.exp(-(self._lambda * self._timeline)**self._rho)
+    
+    def predict_hazards(self, X):
+        return np.exp(-X.dot(self._lambda))
+    
+    def predict_cumulative_hazard(self, X):
+        """
+        Return the cumulative hazard function of each sample
+        """
         
+        timeline = np.tile(self.unique_event_times, (X.shape[0], 1))
+        
+        return pd.DataFrame((timeline.T * self.predict_hazards(X))**self._rho, 
+                         index = self.unique_event_times)
+    
+    def predict_survival(self, X):
+        """
+        Return the survival function of each sample
+        """
+        
+        return np.exp(-self.predict_cumulative_hazard(X))
 
 class WeibullUnivariate():
     """
