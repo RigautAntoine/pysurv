@@ -3,8 +3,38 @@ import pandas as pd
 import matplotlib.pylab as plt
 from .stats import inv_normal_cdf
 
-
 class NelsonAalen():
+    
+    def __init__(self, events, durations, alpha=0.95, strata=None):
+        
+        self.kms = []
+        
+        if strata is None:
+            self.kms.append(NelsonAalenFitter(events, durations, label='', alpha=alpha))
+        else:
+            stratas = np.unique(strata)
+            for s in stratas:
+                m = (strata == s)
+                self.kms.append(NelsonAalenFitter(events[m], durations[m], label=s, alpha=alpha))
+                
+    def summary(self):
+        return [km.summary() for km in self.kms]
+    
+    def plot(self):
+        
+        ax = plt.figure().add_subplot(111)
+        
+        for km in self.kms:
+            km.plot(ax=ax)
+            
+        
+        ax.set_ylim(0)
+        ax.set_xlim(0)
+        ax.set_xlabel('Timeline')
+        
+        plt.legend(loc='best')
+
+class NelsonAalenFitter():
     """
     The Nelson–Aalen estimator is a non-parametric estimator of the cumulative 
     hazard rate function in case of censored data
@@ -14,7 +44,7 @@ class NelsonAalen():
     TO-DO: variance and confidence interval, and strata
     """
     
-    def __init__(self, events, durations, entry_time=None, alpha=0.95):
+    def __init__(self, events, durations, label, entry_time=None, alpha=0.95):
         """
         Params:
             events (numpy.array): 0 or 1
@@ -22,6 +52,7 @@ class NelsonAalen():
             entry_time (numpy.array): time of entry into study (default is None - entry T is 0 for all)
         """
         self.alpha = alpha
+        self.label = label
         self.events = events
         self.durations = durations
         
@@ -71,10 +102,19 @@ class NelsonAalen():
         '''
         return self._lifetable
     
-    def plot_cumhaz(self,**kwargs):
+    def plot(self, ax):
         
-        ax = plt.step(x = self._lifetable.index, y = self._lifetable['cumhaz'], **kwargs) 
-        #ax.set_ylim(0, 1)
-        #ax.set_xlim(0)
+        # Set ax
+        c = ax._get_lines.get_next_color()
+        self._lifetable['cumhaz'].plot(drawstyle="steps-post", 
+                                         c=c, 
+                                         label='nelsonaalen_' + str(self.label))
+        
+        ax.fill_between(self._lifetable.index, 
+                        y1=self._lifetable['lower'].values, 
+                        y2=self._lifetable['upper'].values, 
+                        step='post', 
+                        alpha=0.3, 
+                        color=c)
         
         return ax

@@ -1,9 +1,42 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pylab as plt
+from matplotlib import pyplot as plt
 from .stats import inv_normal_cdf
 
+
 class KaplanMeier():
+    
+    def __init__(self, events, durations, alpha=0.95, strata=None):
+        
+        self.kms = []
+        
+        if strata is None:
+            self.kms.append(KaplanMeierFitter(events, durations, label='', alpha=alpha))
+        else:
+            stratas = np.unique(strata)
+            for s in stratas:
+                m = (strata == s)
+                self.kms.append(KaplanMeierFitter(events[m], durations[m], label=s, alpha=alpha))
+                
+    def summary(self):
+        return [km.summary() for km in self.kms]
+    
+    def plot(self):
+        
+        ax = plt.figure().add_subplot(111)
+        
+        for km in self.kms:
+            km.plot(ax=ax)
+            
+        
+        ax.set_ylim(0, 1)
+        ax.set_xlim(0)
+        ax.set_xlabel('Timeline')
+        
+        plt.legend(loc='best')
+            
+
+class KaplanMeierFitter():
     """
     Non-parametric estimator of the survival function
     for non- or right-censored data.
@@ -11,12 +44,13 @@ class KaplanMeier():
     TO-DO: Strata, confidence interval
     """
     
-    def __init__(self, events, durations, alpha=0.95):
+    def __init__(self, events, durations, label, alpha=0.95):
         """
         Params:
             events (numpy.array): 0 or 1
             durations (numpy.array): time at which event happened or observation was censored 
         """
+        self.label=label
         self._fitted = False
         self.events = events
         self.durations = durations
@@ -100,10 +134,21 @@ class KaplanMeier():
         '''
         return self._lifetable
     
-    def plot_survival(self,**kwargs):
+    def plot(self, ax):
         
-        ax = plt.step(x = self._lifetable.index, y = self._lifetable['survival'], **kwargs) 
-        #ax.set_ylim(0, 1)
-        #ax.set_xlim(0)
+        # Set ax
+        c = ax._get_lines.get_next_color()
+        self._lifetable['survival'].plot(drawstyle="steps-post", 
+                                         c=c, 
+                                         label='km_estimate_' + str(self.label))
+        
+        confdf = self._compute_confidence_bounds().set_index('time')[['lower', 'upper']]
+        
+        ax.fill_between(confdf.index, 
+                        y1=confdf['lower'].values, 
+                        y2=confdf['upper'].values, 
+                        step='post', 
+                        alpha=0.3, 
+                        color=c)
         
         return ax
